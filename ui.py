@@ -11,7 +11,9 @@
 import shlex
 from Profile import Profile, Post, DsuProfileError, DsuFileError
 from pathlib import Path
+import ds_client
 
+DSP_PORT = 3001
 def run():
     current_file= None
     current_profile=None
@@ -69,11 +71,13 @@ def create_file(order_parts, current_profile, current_file):
         except (DsuFileError, DsuProfileError):
             print("ERROR")
             return current_profile, current_file
-    user_name=input("username:")
-    pass_word=input("password:")
-    bio=input("bio:")
+    user_name = input("username:")
+    pass_word = input("password:")
+    bio = input("bio:")
+    server = input("server:")
 
-    if user_name.strip()=='' or pass_word.strip()=='' or bio.strip()=='':
+
+    if user_name.strip()=='' or pass_word.strip()=='' or bio.strip()=='' or server.strip()=='':
         print("ERROR")
         return current_profile, current_file
     if " " in user_name or " " in pass_word:
@@ -83,6 +87,7 @@ def create_file(order_parts, current_profile, current_file):
     profile.username=user_name
     profile.password=pass_word
     profile.bio=bio
+    profile.dsuserver = server
     try:
         file_path.touch()
         profile.save_profile(file_path)
@@ -111,65 +116,136 @@ def open_file(order_parts, current_profile, current_file):
         print("ERROR")
         return current_profile, current_file
     
+    
 def edit_profile(order_parts, current_profile, current_file):
     if current_profile is None or current_file is None:
         print("ERROR")
         return
-    if len(order_parts)<3:
+
+    if len(order_parts) < 3:
         print("ERROR")
         return
-    index=1
-    while index<len(order_parts):
-        option=order_parts[index]
 
-        if index+1 >= len(order_parts):
+    index = 1
+
+    while index < len(order_parts):
+        option = order_parts[index]
+
+        if index + 1 >= len(order_parts):
             print("ERROR")
             return
-        
-        value=order_parts[index+1]
-        index +=2
-        
 
-        if option=="-usr":
-            if value.strip()==''or' ' in value:
-                print("ERROR")
-                return
-            current_profile.username=value
+        value = order_parts[index + 1]
+        index += 2
 
-        elif option=="-pwd":
-            if value.strip()==''or ' 'in value:
+        if option == "-usr":
+            if value.strip() == '' or ' ' in value:
                 print("ERROR")
                 return
-            current_profile.password=value
+            current_profile.username = value
 
-        elif option=='-bio':
-            if value.strip()=='':
+        elif option == "-pwd":
+            if value.strip() == '' or ' ' in value:
                 print("ERROR")
                 return
-            current_profile.bio=value
-        
-        elif option=='-addpost':
-            if value.strip()=='':
+            current_profile.password = value
+
+        elif option == "-bio":
+            if value.strip() == '':
                 print("ERROR")
                 return
-            post=Post(value)
+            current_profile.bio = value
+
+        elif option == "-server":
+            if value.strip() == '':
+                print("ERROR")
+                return
+            current_profile.dsuserver = value
+
+        elif option == "-addpost":
+            if value.strip() == '':
+                print("ERROR")
+                return
+            post = Post(value)
             current_profile.add_post(post)
-        
-        elif option=='-delpost':
+
+        elif option == "-delpost":
             try:
-                delete_index=int(value)
+                delete_index = int(value)
             except ValueError:
                 print("ERROR")
                 return
-            delete_resultbool=current_profile.del_post(delete_index)
+
+            delete_resultbool = current_profile.del_post(delete_index)
+
             if delete_resultbool == False:
+                print("ERROR")
+                return
+
+        elif option == "-publishpost":
+            if current_profile.dsuserver is None or current_profile.dsuserver.strip() == "":
+                print("ERROR")
+                return
+
+            try:
+                post_index = int(value)
+            except ValueError:
+                print("ERROR")
+                return
+
+            posts = current_profile.get_posts()
+
+            if post_index < 0 or post_index >= len(posts):
+                print("ERROR")
+                return
+
+            message = posts[post_index].get_entry()
+
+            if message.strip() == "":
+                print("ERROR")
+                return
+
+            result = ds_client.send(
+                current_profile.dsuserver,
+                DSP_PORT,
+                current_profile.username,
+                current_profile.password,
+                message
+            )
+
+            if result:
+                print("Post published online.")
+            else:
+                print("ERROR")
+                return
+
+        elif option == "-publishbio":
+            if current_profile.dsuserver is None or current_profile.dsuserver.strip() == "":
+                print("ERROR")
+                return
+
+            if current_profile.bio.strip() == "":
+                print("ERROR")
+                return
+
+            result = ds_client.send(
+                current_profile.dsuserver,
+                DSP_PORT,
+                current_profile.username,
+                current_profile.password,
+                "",
+                current_profile.bio
+            )
+
+            if result:
+                print("Bio published online.")
+            else:
                 print("ERROR")
                 return
 
         else:
             print("ERROR")
             return
-        
 
         try:
             current_profile.save_profile(str(current_file))
