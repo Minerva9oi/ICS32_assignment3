@@ -57,7 +57,7 @@ def extract_json(json_msg:str) -> DataTuple:
   '''
   try:
     json_obj = json.loads(json_msg)
-    response = json.obj["response"]
+    response = json_obj["response"]
 
     response_type = response["type"]
     message = response["message"]
@@ -74,4 +74,4 @@ def extract_json(json_msg:str) -> DataTuple:
   
   except KeyError:
     print("Invalid DSP response format")
-    return DataTuple("error", "Invalid DSP response format")
+    return DataTuple("error", "Invalid DSP response format", "")
